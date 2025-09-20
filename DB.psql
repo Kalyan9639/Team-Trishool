@@ -1,0 +1,178 @@
+-- Reference tables
+CREATE TABLE skill_ontology (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  normalized_name TEXT NOT NULL,
+  synonyms TEXT[] DEFAULT '{}'
+);
+
+CREATE TABLE location (
+  id SERIAL PRIMARY KEY,
+  city TEXT,
+  state TEXT,
+  country TEXT,
+  raw TEXT NOT NULL
+);
+
+-- File storage metadata (for uploads)
+CREATE TABLE files (
+  id UUID PRIMARY KEY,
+  filename TEXT NOT NULL,
+  mime_type TEXT,
+  bytes INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Jobs (Job Descriptions)
+CREATE TABLE jobs (
+  id UUID PRIMARY KEY,
+  title TEXT NOT NULL,
+  company TEXT,
+  description TEXT,            -- cleaned full text
+  raw_text TEXT,               -- original extracted text
+  location_id INT REFERENCES location(id),
+  employment_type TEXT,        -- Full-time / Internship / Fresher / Permanent
+  schedule TEXT,               -- e.g., Day shift, Mon–Fri
+  onsite_remote TEXT,          -- Onsite / Remote / Hybrid
+  internship BOOLEAN DEFAULT FALSE,
+  internship_duration_months INT,
+  stipend_amount NUMERIC,      -- e.g., 5000
+  stipend_currency TEXT,       -- "INR"
+  bond_required BOOLEAN DEFAULT FALSE,
+  bond_duration_months INT,    -- e.g., 30 or 24
+  batch_eligibility TEXT,      -- e.g., "2023 and earlier"
+  min_experience_years NUMERIC, -- e.g., ≥1 year in manufacturing
+  qualifications TEXT,         -- freeform extracted education reqs
+  responsibilities TEXT,       -- freeform responsibilities
+  created_at TIMESTAMPTZ DEFAULT now(),
+  file_id UUID REFERENCES files(id)
+);
+
+-- Job requirement items
+CREATE TYPE requirement_type AS ENUM ('must_have_skill','nice_to_have_skill','qualification','responsibility','tool','certification','domain');
+CREATE TABLE job_requirements (
+  id SERIAL PRIMARY KEY,
+  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  req_type requirement_type NOT NULL,
+  label TEXT NOT NULL,              -- human-readable
+  skill_id INT REFERENCES skill_ontology(id), -- normalized mapping when applicable
+  weight NUMERIC DEFAULT 1.0,       -- allows prioritization (must-have > nice-to-have)
+  source TEXT,                      -- heuristic, rules, LLM, manual
+  UNIQUE(job_id, req_type, label)
+);
+
+-- Optional benefits / meta per JD
+CREATE TABLE job_benefits (
+  id SERIAL PRIMARY KEY,
+  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  name TEXT,
+  value TEXT
+);
+
+-- Resumes
+CREATE TABLE resumes (
+  id UUID PRIMARY KEY,
+  candidate_name TEXT,
+  email TEXT,
+  phone TEXT,
+  location_id INT REFERENCES location(id),
+  summary TEXT,
+  raw_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  file_id UUID REFERENCES files(id)
+);
+
+-- Resume sections (normalized)
+CREATE TYPE resume_section_type AS ENUM ('experience','education','skills','projects','certifications','summary','other');
+CREATE TABLE resume_sections (
+  id SERIAL PRIMARY KEY,
+  resume_id UUID REFERENCES resumes(id) ON DELETE CASCADE,
+  section_type resume_section_type NOT NULL,
+  content TEXT NOT NULL,
+  order_index INT DEFAULT 0
+);
+
+-- Extracted resume skills (normalized to ontology when possible)
+CREATE TABLE resume_skills (
+  id SERIAL PRIMARY KEY,
+  resume_id UUID REFERENCES resumes(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  skill_id INT REFERENCES skill_ontology(id),
+  proficiency TEXT,               -- optional (e.g., beginner/intermediate/advanced)
+  years_experience NUMERIC,       -- optional
+  UNIQUE(resume_id, label)
+);
+
+-- Embeddings cache (JD and Resume, document and chunk level)
+CREATE TYPE embedding_owner AS ENUM ('job','resume','job_chunk','resume_chunk');
+CREATE TABLE embeddings (
+  id UUID PRIMARY KEY,
+  owner_type embedding_owner NOT NULL,
+  owner_id TEXT NOT NULL,           -- job UUID or resume UUID or chunk key
+  model TEXT NOT NULL,              -- e.g., text-embedding-3-large
+  dim INT NOT NULL,
+  vector VECTOR,                    -- use pgvector extension
+  hash TEXT NOT NULL,               -- sha256 of content
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(owner_type, owner_id, model, hash)
+);
+
+-- Evaluations (one resume against one JD)
+CREATE TYPE verdict_level AS ENUM ('High','Medium','Low');
+CREATE TABLE evaluations (
+  id UUID PRIMARY KEY,
+  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  resume_id UUID REFERENCES resumes(id) ON DELETE CASCADE,
+  final_score INT CHECK (final_score BETWEEN 0 AND 100),
+  verdict verdict_level NOT NULL,
+  hard_score NUMERIC,               -- skill/BM25/TF-IDF component (0-100)
+  semantic_score NUMERIC,           -- embedding component (0-100)
+  thresholds JSONB,                 -- {high:75, medium:50}
+  missing_skills TEXT[],            -- labels
+  missing_projects TEXT[],
+  missing_certifications TEXT[],
+  feedback TEXT,                    -- generated suggestions
+  detail JSONB,                     -- explainability: contributions, matched snippets
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Per-requirement match detail (explainability)
+CREATE TYPE match_status AS ENUM ('matched','partial','missing');
+CREATE TABLE evaluation_details (
+  id SERIAL PRIMARY KEY,
+  evaluation_id UUID REFERENCES evaluations(id) ON DELETE CASCADE,
+  job_requirement_id INT REFERENCES job_requirements(id),
+  status match_status NOT NULL,
+  score NUMERIC DEFAULT 0,          -- 0..1 per requirement
+  evidence TEXT,                    -- snippet from resume
+  UNIQUE(evaluation_id, job_requirement_id)
+);
+
+-- Batching / queues
+CREATE TABLE batch_jobs (
+  id UUID PRIMARY KEY,
+  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',    -- pending/running/completed/failed
+  total INT DEFAULT 0,
+  processed INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ
+);
+
+CREATE TABLE batch_items (
+  id UUID PRIMARY KEY,
+  batch_id UUID REFERENCES batch_jobs(id) ON DELETE CASCADE,
+  resume_id UUID REFERENCES resumes(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'queued',     -- queued/done/failed
+  error TEXT
+);
+
+-- Indexing for performance
+CREATE INDEX idx_jobs_location ON jobs(location_id);
+CREATE INDEX idx_job_requirements_job ON job_requirements(job_id);
+CREATE INDEX idx_resumes_location ON resumes(location_id);
+CREATE INDEX idx_resume_skills_resume ON resume_skills(resume_id);
+CREATE INDEX idx_evaluations_job ON evaluations(job_id);
+CREATE INDEX idx_evaluations_resume ON evaluations(resume_id);
+CREATE INDEX idx_embeddings_owner ON embeddings(owner_type, owner_id);
