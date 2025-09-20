@@ -1,0 +1,60 @@
+# Core dependencies
+fastapi
+uvicorn
+python-multipart
+
+# LangChain ecosystem
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+langgraph
+langsmith
+langchain-chroma
+
+# langchain==0.1.0
+# langchain-community==0.0.10
+# langchain-google-genai==0.0.6
+# langgraph==0.0.26
+# langsmith==0.0.69
+
+# Document processing
+PyMuPDF
+python-docx
+easyocr
+
+# NLP and text processing
+spacy
+nltk
+scikit-learn
+
+# Vector databases and search
+chromadb
+bm25s
+
+# Google AI
+google-genai
+
+# Database
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Utilities
+pydantic
+python-dotenv
+pandas
+numpy
+requests
+python-json-logger
+aiofiles
+
+# Development
+pytest
+pytest-asyncio
+black
+flake8
+
+# Optional: For production deployment
+# gunicorn==21.2.0
+# redis==5.0.1

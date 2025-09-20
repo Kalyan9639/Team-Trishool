@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Relevance Check - Intelligent Screening</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.3);
+        }
+        
+        .sidebar {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(148, 163, 184, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 400px;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        
+        .main-content {
+            margin-left: 400px;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .file-dropzone {
+            border: 2px dashed #475569;
+            background: rgba(30, 41, 59, 0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .file-dropzone.dragover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .file-dropzone:hover {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .progress-ring {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        .skill-tag {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+            transition: all 0.2s ease;
+        }
+        
+        .skill-tag.matched {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+        
+        .skill-tag.missing {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        
+        .candidate-card {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        
+        .candidate-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.4);
+        }
+        
+        .loading-spinner {
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar p-6 flex flex-col gap-6">
+        <!-- Header -->
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-white">AI Resume Screener</h1>
+                <p class="text-sm text-slate-400">Intelligent candidate ranking</p>
+            </div>
+        </div>
+
+        <!-- Step 1: Job Title -->
+        <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">1</span>
+                Job Title
+            </h2>
+            <input 
+                id="jobTitle" 
+                type="text" 
+                placeholder="e.g., Senior Data Scientist"
+                class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                value="Senior Data Scientist"
+            />
+        </div>
+
+        <!-- Step 2: Job Description -->
+        <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">2</span>
+                Job Description
+            </h2>
+            <textarea 
+                id="jobDescription" 
+                rows="6"
+                placeholder="Paste the complete job description here..."
+                class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none"
+            >We are seeking an experienced Senior Data Scientist to join our innovative team. 
+
+Key Responsibilities:
+• Develop machine learning models for business insights
+• Work with large datasets using Python and SQL
+• Deploy models on cloud platforms
+• Collaborate with cross-functional teams
+
+Required Skills:
+Python, SQL, Machine Learning, TensorFlow, Scikit-learn, Pandas, AWS, Statistics, Data Visualization</textarea>
+        </div>
+
+        <!-- Step 3: Required Skills -->
+        <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">3</span>
+                Required Skills
+            </h2>
+            <input 
+                id="requiredSkills" 
+                type="text" 
+                placeholder="Python, SQL, Machine Learning, TensorFlow..."
+                class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                value="Python, SQL, Machine Learning, TensorFlow, Scikit-learn, Pandas, AWS, Statistics"
+            />
+            <p class="text-xs text-slate-400">Separate skills with commas</p>
+        </div>
+
+        <!-- Step 4: Upload Resumes -->
+        <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">4</span>
+                Upload Resumes
+            </h2>
+            <div 
+                id="dropzone" 
+                class="file-dropzone rounded-lg p-8 text-center border-2 border-dashed"
+            >
+                <div class="flex flex-col items-center gap-3">
+                    <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <div>
+                        <p class="text-slate-300 font-medium">Drag & drop PDF/DOCX files here</p>
+                        <p class="text-sm text-slate-500 mt-1">or click to browse</p>
+                    </div>
+                </div>
+                <input 
+                    id="fileInput" 
+                    type="file" 
+                    accept=".pdf,.docx" 
+                    multiple 
+                    class="hidden"
+                />
+            </div>
+            <div id="fileList" class="space-y-2"></div>
+        </div>
+
+        <!-- Analyze Button -->
+        <div class="mt-auto space-y-3">
+            <button 
+                id="analyzeBtn" 
+                class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+                <span id="analyzeText">🚀 Start Analysis</span>
+                <div id="analyzeSpinner" class="loading-spinner w-5 h-5 mx-auto hidden"></div>
+            </button>
+            <div id="statusText" class="text-sm text-center text-slate-400 min-h-[20px]"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 id="analysisTitle" class="text-4xl font-bold text-white mb-2">
+                    Analysis Results
+                </h1>
+                <p id="analysisSubtitle" class="text-slate-400 text-lg">
+                    Upload resumes to see intelligent rankings
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button 
+                    id="exportBtn" 
+                    class="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Export Results
+                </button>
+                <button 
+                    id="settingsBtn" 
+                    class="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="resultsContainer" class="space-y-6">
+            <!-- Placeholder content -->
+            <div class="text-center py-20">
+                <div class="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full flex items-center justify-center">
+                    <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-semibold text-slate-300 mb-3">Ready to Analyze Resumes</h3>
+                <p class="text-slate-400 max-w-md mx-auto">Upload resume files and click "Start Analysis" to see intelligent candidate rankings with AI-powered insights.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:8000';
+        const RANK_ENDPOINT = `${API_BASE}/rank-resumes`;
+
+        // State
+        let selectedFiles = [];
+        let analysisResults = null;
+
+        // DOM Elements
+        const elements = {
+            jobTitle: document.getElementById('jobTitle'),
+            jobDescription: document.getElementById('jobDescription'),
+            requiredSkills: document.getElementById('requiredSkills'),
+            dropzone: document.getElementById('dropzone'),
+            fileInput: document.getElementById('fileInput'),
+            fileList: document.getElementById('fileList'),
+            analyzeBtn: document.getElementById('analyzeBtn'),
+            analyzeText: document.getElementById('analyzeText'),
+            analyzeSpinner: document.getElementById('analyzeSpinner'),
+            statusText: document.getElementById('statusText'),
+            analysisTitle: document.getElementById('analysisTitle'),
+            analysisSubtitle: document.getElementById('analysisSubtitle'),
+            resultsContainer: document.getElementById('resultsContainer'),
+            exportBtn: document.getElementById('exportBtn')
+        };
+
+        // Utility Functions
+        function formatFileSize(bytes) {
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 B';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateStatus(message, isError = false) {
+            elements.statusText.textContent = message;
+            elements.statusText.className = `text-sm text-center min-h-[20px] ${isError ? 'text-red-400' : 'text-slate-400'}`;
+        }
+
+        function setBusy(busy) {
+            elements.analyzeBtn.disabled = busy;
+            elements.analyzeText.style.display = busy ? 'none' : 'block';
+            elements.analyzeSpinner.style.display = busy ? 'block' : 'none';
+            
+            if (busy) {
+                elements.analyzeBtn.classList.add('cursor-not-allowed');
+            } else {
+                elements.analyzeBtn.classList.remove('cursor-not-allowed');
+            }
+        }
+
+        // File Handling
+        function addFiles(files) {
+            Array.from(files).forEach(file => {
+                if (file.type === 'application/pdf' || 
+                    file.name.toLowerCase().endsWith('.docx') ||
+                    file.name.toLowerCase().endsWith('.pdf')) {
+                    
+                    // Check for duplicates
+                    if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                        selectedFiles.push(file);
+                    }
+                }
+            });
+            renderFileList();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFileList();
+        }
+
+        function renderFileList() {
+            if (selectedFiles.length === 0) {
+                elements.fileList.innerHTML = '';
+                return;
+            }
+
+            elements.fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-slate-200 truncate">${escapeHtml(file.name)}</p>
+                        <p class="text-xs text-slate-400">${formatFileSize(file.size)}</p>
+                    </div>
+                    <button 
+                        onclick="removeFile(${index})"
+                        class="w-6 h-6 text-slate-400 hover:text-red-400 transition-colors duration-200"
+                    >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Score and Progress Visualization
+        function createProgressRing(score, size = 60) {
+            const radius = (size - 8) / 2;
+            const circumference = radius * 2 * Math.PI;
+            const strokeDasharray = circumference;
+            const strokeDashoffset = circumference - (score / 100) * circumference;
+            
+            let color = '#ef4444'; // red
+            if (score >= 80) color = '#22c55e'; // green
+            else if (score >= 60) color = '#f59e0b'; // yellow
+            
+            return `
+                <div class="relative" style="width: ${size}px; height: ${size}px;">
+                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 ${size} ${size}">
+                        <circle
+                            cx="${size / 2}"
+                            cy="${size / 2}"
+                            r="${radius}"
+                            stroke="rgba(148, 163, 184, 0.2)"
+                            stroke-width="4"
+                            fill="none"
+                        />
+                        <circle
+                            class="progress-ring"
+                            cx="${size / 2}"
+                            cy="${size / 2}"
+                            r="${radius}"
+                            stroke="${color}"
+                            stroke-width="4"
+                            fill="none"
+                            stroke-dasharray="${strokeDasharray}"
+                            stroke-dashoffset="${strokeDashoffset}"
+                        />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-sm font-bold text-white">${Math.round(score)}%</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSkills(skills, type = 'default') {
+            if (!skills || skills.length === 0) return '<span class="text-slate-500">None</span>';
+            
+            return skills.map(skill => `
+                <span class="skill-tag ${type} px-2 py-1 rounded-md text-xs font-medium">
+                    ${escapeHtml(skill)}
+                </span>
+            `).join(' ');
+        }
+
+        // Results Rendering
+        function renderResults(data) {
+            analysisResults = data;
+            
+            // Update header
+            const jobTitle = elements.jobTitle.value || 'Position';
+            elements.analysisTitle.textContent = `Analysis: "${jobTitle}"`;
+            elements.analysisSubtitle.textContent = 
+                `Found ${data.top_candidates.length} candidates • Processed in ${data.processing_time.toFixed(1)}s`;
+            
+            // Enable export
+            elements.exportBtn.disabled = false;
+            
+            // Render candidates
+            elements.resultsContainer.innerHTML = data.top_candidates.map((candidate, index) => {
+                const score = Math.round(candidate.semantic_score * 100);
+                const skillCoverage = Math.round((candidate.skill_match_count / candidate.total_skills_required) * 100);
+                
+                let verdictClass = 'bg-red-900/20 text-red-300 border-red-500/30';
+                let verdict = 'Low Fit';
+                
+                if (skillCoverage >= 80) {
+                    verdictClass = 'bg-green-900/20 text-green-300 border-green-500/30';
+                    verdict = 'Excellent Fit';
+                } else if (skillCoverage >= 60) {
+                    verdictClass = 'bg-yellow-900/20 text-yellow-300 border-yellow-500/30';
+                    verdict = 'Good Fit';
+                } else if (skillCoverage >= 40) {
+                    verdictClass = 'bg-blue-900/20 text-blue-300 border-blue-500/30';
+                    verdict = 'Moderate Fit';
+                }
+
+                return `
+                    <div class="candidate-card glass-card rounded-xl p-6 fade-in" style="animation-delay: ${index * 0.1}s">
+                        <!-- Header -->
+                        <div class="flex items-start gap-4 mb-6">
+                            <div class="flex-shrink-0">
+                                ${createProgressRing(skillCoverage, 80)}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h3 class="text-xl font-bold text-white mb-1">
+                                            <span class="text-slate-400 mr-2">#${candidate.rank}</span>
+                                            ${escapeHtml(candidate.filename)}
+                                        </h3>
+                                        <div class="flex items-center gap-3 mb-3">
+                                            <span class="text-2xl font-bold text-blue-400">${score}%</span>
+                                            <span class="text-slate-400">semantic match</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium border ${verdictClass}">
+                                            ${verdict}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Skills Overview -->
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span class="text-slate-400">Skills Matched:</span>
+                                        <span class="text-white font-semibold ml-2">
+                                            ${candidate.skill_match_count}/${candidate.total_skills_required}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-400">Coverage:</span>
+                                        <span class="text-white font-semibold ml-2">${skillCoverage}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Skills Analysis -->
+                        <div class="grid md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                    Matched Skills (${candidate.matched_skills.length})
+                                </h4>
+                                <div class="flex flex-wrap gap-1">
+                                    ${renderSkills(candidate.matched_skills, 'matched')}
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                    <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                                    Missing Skills (${candidate.missing_skills.length})
+                                </h4>
+                                <div class="flex flex-wrap gap-1">
+                                    ${renderSkills(candidate.missing_skills, 'missing')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Key Evidence -->
+                        <div>
+                            <h4 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Key Evidence
+                            </h4>
+                            <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                                <p class="text-slate-300 text-sm italic leading-relaxed">
+                                    ${escapeHtml(candidate.key_matching_chunk.substring(0, 300))}${candidate.key_matching_chunk.length > 300 ? '...' : ''}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // API Integration
+        async function analyzeResumes() {
+            // Validation
+            const jobTitle = elements.jobTitle.value.trim();
+            const jobDescription = elements.jobDescription.value.trim();
+            const requiredSkills = elements.requiredSkills.value.trim();
+
+            if (!jobTitle) {
+                updateStatus('Please enter a job title', true);
+                return;
+            }
+
+            if (!jobDescription || jobDescription.length < 20) {
+                updateStatus('Please enter a detailed job description', true);
+                return;
+            }
+
+            if (!requiredSkills) {
+                updateStatus('Please specify required skills', true);
+                return;
+            }
+
+            if (selectedFiles.length === 0) {
+                updateStatus('Please upload at least one resume file', true);
+                return;
+            }
+
+            setBusy(true);
+            updateStatus('Analyzing resumes... This may take a moment');
+
+            try {
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('job_title', jobTitle);
+                formData.append('job_description', jobDescription);
+                formData.append('required_skills', requiredSkills);
+                formData.append('top_n', '20');
+
+                // Add files
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                // Make API call
+                const response = await fetch(RANK_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorData}`);
+                }
+
+                const result = await response.json();
+                
+                // Render results
+                renderResults(result);
+                updateStatus('Analysis completed successfully! ✨');
+
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                updateStatus(`Analysis failed: ${error.message}`, true);
+                
+                // Show error state
+                elements.resultsContainer.innerHTML = `
+                    <div class="glass-card rounded-xl p-8 text-center">
+                        <div class="w-16 h-16 mx-auto mb-4 bg-red-900/20 rounded-full flex items-center justify-center">
+                            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-2">Analysis Failed</h3>
+                        <p class="text-slate-400 mb-4">${error.message}</p>
+                        <button onclick="location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        // Export Functionality
+        function exportResults() {
+            if (!analysisResults) return;
+            
+            const csvContent = generateCSV(analysisResults);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `resume_analysis_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        function generateCSV(data) {
+            const headers = ['Rank', 'Filename', 'Semantic Score (%)', 'Skills Matched', 'Total Skills', 'Coverage (%)', 'Matched Skills', 'Missing Skills'];
+            
+            const rows = data.top_candidates.map(candidate => [
+                candidate.rank,
+                candidate.filename,
+                Math.round(candidate.semantic_score * 100),
+                candidate.skill_match_count,
+                candidate.total_skills_required,
+                Math.round((candidate.skill_match_count / candidate.total_skills_required) * 100),
+                '"' + candidate.matched_skills.join(', ') + '"',
+                '"' + candidate.missing_skills.join(', ') + '"'
+            ]);
+
+            return [headers, ...rows].map(row => row.join(',')).join('\n');
+        }
+
+        // Event Listeners
+        elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+        elements.fileInput.addEventListener('change', (e) => addFiles(e.target.files));
+        
+        // Drag and Drop
+        elements.dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.dropzone.classList.add('dragover');
+        });
+        
+        elements.dropzone.addEventListener('dragleave', () => {
+            elements.dropzone.classList.remove('dragover');
+        });
+        
+        elements.dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.dropzone.classList.remove('dragover');
+            addFiles(e.dataTransfer.files);
+        });
+
+        // Button Events
+        elements.analyzeBtn.addEventListener('click', analyzeResumes);
+        elements.exportBtn.addEventListener('click', exportResults);
+
+        // Real-time title update
+        elements.jobTitle.addEventListener('input', () => {
+            const title = elements.jobTitle.value || 'Analysis Results';
+            elements.analysisTitle.textContent = title;
+        });
+
+        // Initialize
+        updateStatus('Ready to analyze resumes');
+        
+        // Global functions for inline event handlers
+        window.removeFile = removeFile;
+    </script>
+</body>
+</html>
