@@ -1,20 +1,12 @@
-# Main web frameworks
-
 fastapi
 uvicorn
 streamlit
 python-multipart
-
-# Data handling and UI
 pandas
 requests
-
-# PDF and DOCX processing
 PyPDF2
 python-docx
 pdfminer.six
-
-# Core LangChain and AI components
 langchain
 langchain-core
 langchain-groq
@@ -22,9 +14,5 @@ langchain-chroma
 chromadb
 langgraph
 langchain-community
-
-# Embedding model libraries
 sentence-transformers
-
-# torch is a dependency for sentence-transformers, specifying it ensures it's installed.
 torch
