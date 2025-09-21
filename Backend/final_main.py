@@ -30,6 +30,9 @@ from langchain_core.output_parsers import JsonOutputParser
 # LangGraph for workflow orchestration
 from langgraph.graph import StateGraph, END
 
+
+# model = SentenceTransformer("all-mpnet-base-v2")
+
 # --- Configuration & Setup ---
 # Note: To run this, you will need to install the libraries from requirements.txt
 # pip install -r requirements.txt
@@ -375,4 +378,5 @@ async def rank_resumes_endpoint(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
