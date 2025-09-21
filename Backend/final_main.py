@@ -31,8 +31,6 @@ from langchain_core.output_parsers import JsonOutputParser
 from langgraph.graph import StateGraph, END
 
 
-# model = SentenceTransformer("all-mpnet-base-v2")
-
 # --- Configuration & Setup ---
 # Note: To run this, you will need to install the libraries from requirements.txt
 # pip install -r requirements.txt
@@ -44,6 +42,8 @@ app = FastAPI(
     description="A LangGraph-powered resume screener using Sentence-Transformers for cloud deployment.",
     version="4.0.0"
 )
+
+model = SentenceTransformer("all-mpnet-base-v2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,7 +133,8 @@ class ResumeWorkflow:
         # This will download the model from Hugging Face hub automatically on first run.
         # 'all-mpnet-base-v2' is a robust model, great for this use case.
         logger.info("Initializing SentenceTransformerEmbeddings with 'all-mpnet-base-v2'...")
-        self.embedding_model = SentenceTransformerEmbeddings(model_name="all-mpnet-base-v2")
+        # self.embedding_model = SentenceTransformerEmbeddings(model_name="all-mpnet-base-v2")
+        self.embedding_model = SentenceTransformerEmbeddings(model_name=model)
         logger.info("✅ SentenceTransformerEmbeddings model initialized.")
 
     # --- All other nodes (preprocess_resumes, semantic_search, etc.) remain unchanged ---
@@ -378,5 +379,6 @@ async def rank_resumes_endpoint(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 
