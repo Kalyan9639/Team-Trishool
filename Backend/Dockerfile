@@ -15,3 +15,5 @@ EXPOSE 8080
 
 # Start FastAPI app from final_main.py
 CMD ["uvicorn", "final_main:app", "--host", "0.0.0.0", "--port", "8080"]
+
+
