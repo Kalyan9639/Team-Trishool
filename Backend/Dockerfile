@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Pre-copy requirements to leverage caching
-COPY backend/requirements.txt .
+COPY Backend/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -14,10 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 # Copy the rest of the code
-COPY backend/ .
+COPY Backend/ .
 
 # Expose port
 EXPOSE 8080
 
 # Start the app (adjust if using Flask)
 CMD ["uvicorn", "final_main:app", "--host", "0.0.0.0", "--port", "8080"]
+
